@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinAlert — Detector de Padrões de Desperdício Financeiro</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f4;
+    --bg-tertiary: #eeece8;
+    --bg-info: #e6f1fb;
+    --bg-danger: #fcebeb;
+    --bg-warning: #faeeda;
+    --bg-success: #eaf3de;
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-info: #185fa5;
+    --text-danger: #a32d2d;
+    --text-warning: #854f0b;
+    --text-success: #3b6d11;
+    --border: rgba(0,0,0,0.12);
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #1c1c1a;
+      --bg-secondary: #252523;
+      --bg-tertiary: #2c2c2a;
+      --bg-info: #042c53;
+      --bg-danger: #501313;
+      --bg-warning: #412402;
+      --bg-success: #173404;
+      --text-primary: #f0ede8;
+      --text-secondary: #b4b2a9;
+      --text-info: #85b7eb;
+      --text-danger: #f09595;
+      --text-warning: #fac775;
+      --text-success: #97c459;
+      --border: rgba(255,255,255,0.12);
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-tertiary); color: var(--text-primary); height: 100vh; overflow: hidden; }
+  .app { display: flex; height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar { width: 210px; background: var(--bg-primary); border-right: 0.5px solid var(--border); display: flex; flex-direction: column; padding: 1rem 0; flex-shrink: 0; }
+  .logo { padding: 0 1rem 1rem; border-bottom: 0.5px solid var(--border); margin-bottom: 0.75rem; }
+  .logo-text { font-size: 16px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+  .logo-text i { color: #185fa5; font-size: 18px; }
+  .logo-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .section-label { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.7px; padding: 0 1rem; margin: 0.75rem 0 0.25rem; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 9px 1rem; font-size: 13px; color: var(--text-secondary); cursor: pointer; border-left: 2px solid transparent; transition: all 0.15s; user-select: none; }
+  .nav-item:hover { background: var(--bg-secondary); color: var(--text-primary); }
+  .nav-item.active { background: var(--bg-info); color: var(--text-info); border-left-color: #185fa5; font-weight: 500; }
+  .nav-item i { font-size: 17px; }
+  .nav-badge { background: #e24b4a; color: #fff; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; margin-left: auto; }
+  .user-area { margin-top: auto; padding: 1rem; border-top: 0.5px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--bg-info); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--text-info); flex-shrink: 0; }
+  .user-name { font-size: 13px; color: var(--text-primary); font-weight: 500; }
+  .user-role { font-size: 11px; color: var(--text-secondary); }
+
+  /* MAIN */
+  .main { flex: 1; overflow-y: auto; padding: 1.5rem; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title { font-size: 18px; font-weight: 500; color: var(--text-primary); margin-bottom: 1.5rem; }
+
+  /* CARDS */
+  .card { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+  .card-title i { font-size: 16px; color: var(--text-secondary); }
+
+  /* METRICS */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1rem; }
+  .metric { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 1rem; }
+  .metric-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .metric-value { font-size: 20px; font-weight: 500; color: var(--text-primary); }
+  .metric-sub { font-size: 11px; margin-top: 3px; }
+  .danger { color: var(--text-danger); }
+  .success { color: var(--text-success); }
+  .warning { color: var(--text-warning); }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  /* TRANSACTIONS */
+  .tx-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 0.5px solid var(--border); }
+  .tx-row:last-child { border-bottom: none; }
+  .tx-info { display: flex; align-items: center; gap: 10px; }
+  .tx-icon { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .tx-desc { font-size: 13px; color: var(--text-primary); }
+  .tx-cat { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+  .tx-amount { font-size: 13px; font-weight: 500; }
+  .tx-amount.despesa { color: var(--text-danger); }
+  .tx-amount.receita { color: var(--text-success); }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+  .badge-danger { background: var(--bg-danger); color: var(--text-danger); }
+  .badge-warning { background: var(--bg-warning); color: var(--text-warning); }
+  .badge-success { background: var(--bg-success); color: var(--text-success); }
+  .badge-info { background: var(--bg-info); color: var(--text-info); }
+
+  /* ALERTS */
+  .alert-item { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-bottom: 0.5px solid var(--border); }
+  .alert-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .alert-icon { width: 34px; height: 34px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; }
+  .alert-icon.danger { background: var(--bg-danger); color: var(--text-danger); }
+  .alert-icon.warning { background: var(--bg-warning); color: var(--text-warning); }
+  .alert-icon.info { background: var(--bg-info); color: var(--text-info); }
+  .alert-icon.success { background: var(--bg-success); color: var(--text-success); }
+  .alert-text { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+  .alert-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; line-height: 1.5; }
+  .alert-date { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* FORMS */
+  .form-group { margin-bottom: 1rem; }
+  .form-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 5px; display: block; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  input[type="text"], input[type="number"], input[type="date"], select {
+    width: 100%; background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: var(--radius-md);
+    padding: 8px 10px; font-size: 13px; color: var(--text-primary); outline: none; transition: border 0.15s;
+    font-family: inherit;
+  }
+  input:focus, select:focus { border-color: #185fa5; box-shadow: 0 0 0 3px rgba(24,95,165,0.12); }
+  select option { background: var(--bg-primary); color: var(--text-primary); }
+  .btn-primary { background: #185fa5; color: #fff; border: none; border-radius: var(--radius-md); padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; transition: background 0.15s; }
+  .btn-primary:hover { background: #0c447c; }
+
+  /* PATTERNS */
+  .pattern-bar { margin-bottom: 12px; }
+  .pattern-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .pattern-track { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+  .pattern-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+
+  /* SCORE */
+  .score-circle { width: 84px; height: 84px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0 auto 12px; border: 3px solid; }
+  .score-num { font-size: 24px; font-weight: 600; }
+  .score-lbl { font-size: 10px; color: var(--text-secondary); }
+
+  /* REPORT */
+  .report-month { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 0.5px solid var(--border); }
+  .report-month:last-child { border-bottom: none; }
+  .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+  .progress-lbl { font-size: 12px; color: var(--text-secondary); width: 95px; flex-shrink: 0; }
+  .progress-bar { flex: 1; height: 7px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+  .progress-val { font-size: 12px; color: var(--text-primary); width: 80px; text-align: right; flex-shrink: 0; }
+
+  /* FEEDBACK */
+  #tx-feedback { font-size: 12px; margin-top: 8px; min-height: 18px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .sidebar { width: 56px; }
+    .logo-sub, .logo-text span, .nav-item span, .section-label, .user-name, .user-role { display: none; }
+    .logo-text { justify-content: center; }
+    .nav-item { justify-content: center; padding: 10px; }
+    .nav-item i { margin: 0; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .main { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-text"><i class="ti ti-chart-pie-2"></i><span>FinAlert</span></div>
+      <div class="logo-sub">Detector de Desperdícios</div>
+    </div>
+    <div class="section-label">Menu</div>
+    <div class="nav-item active" onclick="showPage('dashboard', this)">
+      <i class="ti ti-layout-dashboard"></i><span>Dashboard</span>
+    </div>
+    <div class="nav-item" onclick="showPage('transacoes', this)">
+      <i class="ti ti-transfer"></i><span>Transações</span>
+    </div>
+    <div class="nav-item" onclick="showPage('analise', this)">
+      <i class="ti ti-chart-bar"></i><span>Análise</span>
+    </div>
+    <div class="nav-item" onclick="showPage('alertas', this)">
+      <i class="ti ti-bell"></i><span>Alertas</span>
+      <span class="nav-badge" id="alert-badge">3</span>
+    </div>
+    <div class="nav-item" onclick="showPage('relatorios', this)">
+      <i class="ti ti-file-text"></i><span>Relatórios</span>
+    </div>
+
+    <div class="user-area">
+      <div class="avatar">AN</div>
+      <div>
+        <div class="user-name">Anataniel</div>
+        <div class="user-role">Utilizador</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">Dashboard — Junho 2026</div>
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">Receita mensal</div>
+          <div class="metric-value">450.000 Kz</div>
+          <div class="metric-sub success">↑ +5% vs mês anterior</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Despesas totais</div>
+          <div class="metric-value">312.400 Kz</div>
+          <div class="metric-sub danger">↑ +18% vs mês anterior</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Desperdícios detectados</div>
+          <div class="metric-value">64.800 Kz</div>
+          <div class="metric-sub danger">20,7% das despesas</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Poupança potencial</div>
+          <div class="metric-value">38.200 Kz</div>
+          <div class="metric-sub success">Se eliminar desperdícios</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><i class="ti ti-chart-area"></i> Despesas por categoria</div>
+          <div style="position:relative;width:100%;height:220px;">
+            <canvas id="chartCat" role="img" aria-label="Gráfico de barras com despesas por categoria"></canvas>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:var(--text-secondary);">
+            <span style="display:flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;border-radius:2px;background:#185fa5;display:inline-block"></span>Normal</span>
+            <span style="display:flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;border-radius:2px;background:#e24b4a;display:inline-block"></span>Desperdício</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-trending-up"></i> Evolução mensal (Jan–Jun)</div>
+          <div style="position:relative;width:100%;height:220px;">
+            <canvas id="chartEvo" role="img" aria-label="Gráfico de linha com evolução de receitas e despesas"></canvas>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:var(--text-secondary);">
+            <span style="display:flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;border-radius:2px;background:#1d9e75;display:inline-block"></span>Receitas</span>
+            <span style="display:flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;border-radius:2px;background:#e24b4a;display:inline-block"></span>Despesas</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="ti ti-clock"></i> Últimas transações</div>
+        <div id="tx-list-dash"></div>
+      </div>
+    </div>
+
+    <!-- TRANSAÇÕES -->
+    <div class="page" id="page-transacoes">
+      <div class="page-title">Registar transação</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><i class="ti ti-plus"></i> Nova transação</div>
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select id="tx-tipo">
+              <option value="despesa">💸 Despesa</option>
+              <option value="receita">💰 Receita</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descrição</label>
+            <input type="text" id="tx-desc" placeholder="Ex: Jantar restaurante">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Valor (Kz)</label>
+              <input type="number" id="tx-valor" placeholder="0" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Categoria</label>
+              <select id="tx-cat">
+                <option>Alimentação</option>
+                <option>Transporte</option>
+                <option>Lazer</option>
+                <option>Serviços</option>
+                <option>Educação</option>
+                <option>Saúde</option>
+                <option>Outros</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data</label>
+            <input type="date" id="tx-data">
+          </div>
+          <button class="btn-primary" onclick="registarTransacao()">
+            <i class="ti ti-plus"></i> Registar transação
+          </button>
+          <div id="tx-feedback"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><i class="ti ti-list"></i> Histórico completo</div>
+          <div id="tx-list-full" style="max-height:380px;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANÁLISE -->
+    <div class="page" id="page-analise">
+      <div class="page-title">Análise de padrões</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><i class="ti ti-target"></i> Pontuação financeira</div>
+          <div class="score-circle" style="border-color:#e24b4a;color:#e24b4a;">
+            <div class="score-num">42</div>
+            <div class="score-lbl">/ 100</div>
+          </div>
+          <div style="text-align:center;font-size:13px;color:var(--text-secondary);margin-bottom:1.25rem;">
+            Atenção — controlo financeiro fraco
+          </div>
+          <div class="card-title" style="margin-bottom:0.75rem;"><i class="ti ti-chart-bar"></i> Padrões de desperdício</div>
+          <div id="patterns-block"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><i class="ti ti-chart-donut"></i> Distribuição de despesas</div>
+          <div style="position:relative;width:100%;height:230px;">
+            <canvas id="chartDonut" role="img" aria-label="Gráfico donut com distribuição de despesas por categoria"></canvas>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:11px;color:var(--text-secondary);" id="donut-legend"></div>
+
+          <div style="border-top:0.5px solid var(--border);margin-top:1rem;padding-top:1rem;">
+            <div class="card-title" style="margin-bottom:0.75rem;"><i class="ti ti-alert-triangle"></i> Categorias críticas</div>
+            <div id="cat-criticas"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALERTAS -->
+    <div class="page" id="page-alertas">
+      <div class="page-title">Alertas inteligentes</div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-bell-ringing"></i> Alertas activos</div>
+        <div id="alertas-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-history"></i> Alertas resolvidos</div>
+        <div id="alertas-hist"></div>
+      </div>
+    </div>
+
+    <!-- RELATÓRIOS -->
+    <div class="page" id="page-relatorios">
+      <div class="page-title">Relatórios mensais</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><i class="ti ti-calendar"></i> Resumo por mês</div>
+          <div id="relatorio-meses"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="ti ti-report"></i> Detalhes — Junho 2026</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:1rem;">Comparação real vs limite por categoria</div>
+          <div id="relatorio-detalhe"></div>
+          <div style="margin-top:1.25rem;padding-top:1rem;border-top:0.5px solid var(--border);">
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:0.5rem;">Resumo executivo</div>
+            <div style="font-size:13px;color:var(--text-primary);line-height:1.6;">
+              Este mês as despesas cresceram <strong style="color:var(--text-danger)">18%</strong> em relação a Maio.
+              Foram identificados <strong>5 padrões de desperdício</strong>, com maior incidência em lazer e compras impulsivas.
+              A eliminação dos desperdícios detectados permitiria uma poupança mensal de
+              <strong style="color:var(--text-success)">38.200 Kz</strong>.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const CAT_META = {
+  'Alimentação': {icon:'ti-bowl', color:'#185fa5'},
+  'Transporte':  {icon:'ti-car', color:'#1d9e75'},
+  'Lazer':       {icon:'ti-confetti', color:'#e24b4a'},
+  'Serviços':    {icon:'ti-tool', color:'#ba7517'},
+  'Educação':    {icon:'ti-school', color:'#7f77dd'},
+  'Saúde':       {icon:'ti-heart-rate-monitor', color:'#d4537e'},
+  'Outros':      {icon:'ti-dots', color:'#888780'}
+};
+
+let transacoes = [
+  {id:1, tipo:'receita',  desc:'Salário',                    valor:450000, cat:'Outros',       data:'2026-06-01'},
+  {id:2, tipo:'despesa',  desc:'Supermercado',               valor:32000,  cat:'Alimentação',  data:'2026-06-02'},
+  {id:3, tipo:'despesa',  desc:'Uber / Bolt diário',         valor:18000,  cat:'Transporte',   data:'2026-06-03'},
+  {id:4, tipo:'despesa',  desc:'Netflix + Prime + Spotify',  valor:8500,   cat:'Lazer',        data:'2026-06-04'},
+  {id:5, tipo:'despesa',  desc:'Jantar restaurante × 4',     valor:24000,  cat:'Alimentação',  data:'2026-06-05'},
+  {id:6, tipo:'despesa',  desc:'Internet + Água + Luz',      valor:35000,  cat:'Serviços',     data:'2026-06-06'},
+  {id:7, tipo:'despesa',  desc:'Compras online impulsivas',  valor:27000,  cat:'Lazer',        data:'2026-06-06'},
+  {id:8, tipo:'despesa',  desc:'Ginásio (não frequentado)',  valor:12000,  cat:'Saúde',        data:'2026-06-07'},
+  {id:9, tipo:'despesa',  desc:'Curso online',               valor:25000,  cat:'Educação',     data:'2026-06-08'},
+  {id:10,tipo:'despesa',  desc:'Combustível',                valor:24000,  cat:'Transporte',   data:'2026-06-09'},
+  {id:11,tipo:'despesa',  desc:'Café + snacks diários',      valor:14800,  cat:'Alimentação',  data:'2026-06-10'},
+  {id:12,tipo:'despesa',  desc:'Subscrições esquecidas',     valor:6300,   cat:'Serviços',     data:'2026-06-11'},
+  {id:13,tipo:'despesa',  desc:'Roupas (não necessárias)',   valor:22000,  cat:'Lazer',        data:'2026-06-12'},
+  {id:14,tipo:'despesa',  desc:'Farmácia',                   valor:8800,   cat:'Saúde',        data:'2026-06-13'},
+  {id:15,tipo:'despesa',  desc:'Aluguer',                    valor:55000,  cat:'Serviços',     data:'2026-06-14'},
+];
+
+const ALERTAS_ATIVOS = [
+  {tipo:'danger',  icon:'ti-trending-up',    titulo:'Lazer acima do limite',       desc:'Despesas em lazer aumentaram 65% em relação ao mês anterior. Limite recomendado: 10% do rendimento.', data:'Hoje'},
+  {tipo:'danger',  icon:'ti-credit-card',    titulo:'Compras impulsivas detectadas',desc:'3 transações com padrão de compra não planeada identificadas (total: 49.000 Kz).', data:'Hoje'},
+  {tipo:'warning', icon:'ti-bell',           titulo:'Subscrições duplicadas',       desc:'Detectadas 2 plataformas de streaming semelhantes activas simultaneamente.', data:'Ontem'},
+  {tipo:'warning', icon:'ti-building-gym',   titulo:'Ginásio não utilizado',        desc:'Pagamento recorrente de 12.000 Kz sem utilização registada nos últimos 30 dias.', data:'3 dias atrás'},
+  {tipo:'info',    icon:'ti-chart-bar',      titulo:'Meta de poupança',             desc:'Ao eliminar os desperdícios identificados pouparia 38.200 Kz este mês.', data:'Esta semana'},
+];
+
+const ALERTAS_HIST = [
+  {tipo:'success', icon:'ti-check', titulo:'Desperdício eliminado', desc:'Subscrição de jornal digital cancelada — economia de 3.500 Kz/mês.', data:'Maio 2026'},
+  {tipo:'success', icon:'ti-check', titulo:'Padrão corrigido',      desc:'Gastos em restaurantes reduziram 30% após alerta emitido.', data:'Abril 2026'},
+];
+
+// ─── NAVIGATION ─────────────────────────────────────────────────────────────
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  el.classList.add('active');
+  if (id === 'analise') renderAnalise();
+}
+
+// ─── TRANSACTIONS ────────────────────────────────────────────────────────────
+function txIcon(tx) {
+  const c = CAT_META[tx.cat] || CAT_META['Outros'];
+  return `<div class="tx-icon" style="background:${c.color}22"><i class="ti ${c.icon}" style="font-size:15px;color:${c.color}"></i></div>`;
+}
+
+function renderTxList(el, list, max) {
+  if (!el) return;
+  const items = max ? list.slice(0, max) : list;
+  el.innerHTML = items.map(tx => `
+    <div class="tx-row">
+      <div class="tx-info">
+        ${txIcon(tx)}
+        <div>
+          <div class="tx-desc">${tx.desc}</div>
+          <div class="tx-cat">${tx.cat} · ${tx.data}</div>
+        </div>
+      </div>
+      <div class="tx-amount ${tx.tipo}">${tx.tipo === 'receita' ? '+' : '−'}${tx.valor.toLocaleString('pt-PT')} Kz</div>
+    </div>`).join('');
+}
+
+function registarTransacao() {
+  const tipo  = document.getElementById('tx-tipo').value;
+  const desc  = document.getElementById('tx-desc').value.trim();
+  const valor = parseFloat(document.getElementById('tx-valor').value);
+  const cat   = document.getElementById('tx-cat').value;
+  const data  = document.getElementById('tx-data').value || new Date().toISOString().slice(0,10);
+  const fb    = document.getElementById('tx-feedback');
+
+  if (!desc || !valor || valor <= 0) {
+    fb.style.color = 'var(--text-danger)';
+    fb.textContent = 'Por favor preencha a descrição e um valor válido.';
+    return;
+  }
+  transacoes.unshift({ id: Date.now(), tipo, desc, valor, cat, data });
+  fb.style.color = 'var(--text-success)';
+  fb.textContent = '✓ Transação registada com sucesso!';
+  document.getElementById('tx-desc').value  = '';
+  document.getElementById('tx-valor').value = '';
+  renderTxList(document.getElementById('tx-list-full'), transacoes);
+  renderTxList(document.getElementById('tx-list-dash'), transacoes, 5);
+  setTimeout(() => fb.textContent = '', 3000);
+}
+
+// ─── ALERTS ──────────────────────────────────────────────────────────────────
+function renderAlertas() {
+  const badgeMap = { danger:'Crítico', warning:'Atenção', info:'Info', success:'Resolvido' };
+  document.getElementById('alertas-list').innerHTML = ALERTAS_ATIVOS.map(a => `
+    <div class="alert-item">
+      <div class="alert-icon ${a.tipo}"><i class="ti ${a.icon}"></i></div>
+      <div>
+        <div class="alert-text">${a.titulo} <span class="badge badge-${a.tipo}" style="margin-left:4px;">${badgeMap[a.tipo]}</span></div>
+        <div class="alert-sub">${a.desc}</div>
+        <div class="alert-date">${a.data}</div>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('alertas-hist').innerHTML = ALERTAS_HIST.map(a => `
+    <div class="alert-item">
+      <div class="alert-icon ${a.tipo}"><i class="ti ${a.icon}"></i></div>
+      <div>
+        <div class="alert-text">${a.titulo}</div>
+        <div class="alert-sub">${a.desc}</div>
+        <div class="alert-date">${a.data}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ─── RELATÓRIOS ──────────────────────────────────────────────────────────────
+function renderRelatorio() {
+  const meses = [
+    {mes:'Junho 2026',  receita:450000, despesa:312400, desp:64800},
+    {mes:'Maio 2026',   receita:440000, despesa:264800, desp:32000},
+    {mes:'Abril 2026',  receita:440000, despesa:241200, desp:18400},
+    {mes:'Março 2026',  receita:435000, despesa:228000, desp:12000},
+  ];
+  document.getElementById('relatorio-meses').innerHTML = meses.map(m => `
+    <div class="report-month">
+      <div>
+        <div style="font-size:13px;font-weight:500;color:var(--text-primary)">${m.mes}</div>
+        <div style="font-size:11px;color:var(--text-secondary)">Receita: ${m.receita.toLocaleString('pt-PT')} Kz</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:13px;color:var(--text-danger)">−${m.despesa.toLocaleString('pt-PT')} Kz</div>
+        <div style="font-size:11px;color:var(--text-warning)">Desp: ${m.desp.toLocaleString('pt-PT')} Kz</div>
+      </div>
+    </div>`).join('');
+
+  const detalhe = [
+    {cat:'Alimentação', val:85000, lim:70000},
+    {cat:'Serviços',    val:62000, lim:55000},
+    {cat:'Transporte',  val:42000, lim:35000},
+    {cat:'Lazer',       val:38000, lim:22000},
+    {cat:'Educação',    val:25000, lim:25000},
+    {cat:'Saúde',       val:20800, lim:20000},
+  ];
+  document.getElementById('relatorio-detalhe').innerHTML = detalhe.map(d => {
+    const pct  = Math.min(100, Math.round(d.val / d.lim * 100));
+    const over = d.val > d.lim;
+    return `<div class="progress-row">
+      <div class="progress-lbl">${d.cat}</div>
+      <div class="progress-bar"><div style="height:100%;width:${pct}%;background:${over ? '#e24b4a' : '#185fa5'};border-radius:4px;transition:width 0.6s"></div></div>
+      <div class="progress-val" style="color:${over ? 'var(--text-danger)' : 'var(--text-primary)'}">${d.val.toLocaleString('pt-PT')} Kz</div>
+    </div>`;}).join('');
+}
+
+// ─── ANÁLISE ─────────────────────────────────────────────────────────────────
+function renderAnalise() {
+  const patterns = [
+    {label:'Gastos impulsivos',              pct:78, color:'#e24b4a'},
+    {label:'Subscrições desnecessárias',     pct:62, color:'#ba7517'},
+    {label:'Gastos recorrentes excessivos',  pct:55, color:'#ba7517'},
+    {label:'Alimentação fora de casa',       pct:48, color:'#185fa5'},
+    {label:'Transporte ineficiente',         pct:35, color:'#185fa5'},
+  ];
+  document.getElementById('patterns-block').innerHTML = patterns.map(p => `
+    <div class="pattern-bar">
+      <div class="pattern-label">
+        <span>${p.label}</span>
+        <span style="color:${p.color};font-weight:500">${p.pct}%</span>
+      </div>
+      <div class="pattern-track">
+        <div class="pattern-fill" style="width:${p.pct}%;background:${p.color}"></div>
+      </div>
+    </div>`).join('');
+
+  const criticas = [
+    {cat:'Lazer',       excesso:'65%', badge:'danger'},
+    {cat:'Alimentação', excesso:'21%', badge:'warning'},
+    {cat:'Serviços',    excesso:'13%', badge:'warning'},
+  ];
+  document.getElementById('cat-criticas').innerHTML = criticas.map(c => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:13px;color:var(--text-primary)">${c.cat}</span>
+      <span class="badge badge-${c.badge}">+${c.excesso} acima do limite</span>
+    </div>`).join('');
+}
+
+// ─── CHARTS ──────────────────────────────────────────────────────────────────
+function initCharts() {
+  // Bar — Despesas por categoria
+  new Chart(document.getElementById('chartCat'), {
+    type: 'bar',
+    data: {
+      labels: ['Alimentação','Transporte','Lazer','Serviços','Educação','Saúde'],
+      datasets: [
+        {label:'Normal',     data:[70000,35000,0,55000,25000,8800],  backgroundColor:'#185fa5', borderRadius:4},
+        {label:'Desperdício',data:[15000,7000,38000,7000,0,12000],   backgroundColor:'#e24b4a', borderRadius:4}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { stacked:true, grid:{display:false}, ticks:{font:{size:11}} },
+        y: { stacked:true, ticks:{callback:v=>v>=1000?Math.round(v/1000)+'k':v, font:{size:11}}, grid:{color:'rgba(128,128,128,0.1)'} }
+      }
+    }
+  });
+
+  // Line — Evolução mensal
+  new Chart(document.getElementById('chartEvo'), {
+    type: 'line',
+    data: {
+      labels: ['Jan','Fev','Mar','Abr','Mai','Jun'],
+      datasets: [
+        {label:'Receitas', data:[430000,435000,435000,440000,440000,450000], borderColor:'#1d9e75', backgroundColor:'rgba(29,158,117,0.08)', fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#1d9e75'},
+        {label:'Despesas', data:[250000,245000,228000,241200,264800,312400], borderColor:'#e24b4a', backgroundColor:'rgba(226,75,74,0.08)',   fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#e24b4a'}
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}, ticks:{font:{size:11}}},
+        y:{ticks:{callback:v=>Math.round(v/1000)+'k', font:{size:11}}, grid:{color:'rgba(128,128,128,0.1)'}}
+      }
+    }
+  });
+
+  // Donut — Distribuição
+  const donutColors  = ['#185fa5','#ba7517','#1d9e75','#e24b4a','#888780','#7f77dd','#d4537e'];
+  const donutLabels  = ['Alimentação','Serviços','Transporte','Lazer','Outros','Educação','Saúde'];
+  const donutData    = [85000,62000,42000,38000,60400,25000,20800];
+  new Chart(document.getElementById('chartDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: donutLabels,
+      datasets: [{ data:donutData, backgroundColor:donutColors, borderWidth:2, borderColor:'var(--bg-primary)' }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      cutout:'65%'
+    }
+  });
+  const total = donutData.reduce((a,b)=>a+b,0);
+  document.getElementById('donut-legend').innerHTML = donutLabels.map((l,i)=>
+    `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:${donutColors[i]};display:inline-block"></span>${l} ${Math.round(donutData[i]/total*100)}%</span>`
+  ).join('');
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('tx-data').value = new Date().toISOString().slice(0,10);
+  renderTxList(document.getElementById('tx-list-dash'), transacoes, 5);
+  renderTxList(document.getElementById('tx-list-full'), transacoes);
+  renderAlertas();
+  renderRelatorio();
+  renderAnalise();
+  initCharts();
+});
+</script>
+</body>
+</html>
